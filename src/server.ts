@@ -28,6 +28,17 @@ let hasConfigurationCapability: boolean = false;
 let hasWorkspaceFolderCapability: boolean = false;
 let hasDiagnosticRelatedInformationCapability: boolean = false;
 
+const Parser = require('web-tree-sitter');
+let parser: typeof Parser;
+// const PascalABCNET = require('tree-sitter-pascalabcnet');
+
+async function initializeParser() {
+    await Parser.init();
+    parser = new Parser;
+    const pabcnet = await Parser.Language.load(`${__dirname}/../tree-sitter-pascalabcnet.wasm`);
+    parser.setLanguage(pabcnet);
+}
+
 connection.onInitialize((params: InitializeParams) => {
     let capabilities = params.capabilities;
 
@@ -61,6 +72,7 @@ connection.onInitialize((params: InitializeParams) => {
             }
         };
     }
+
     return result;
 });
 
@@ -131,11 +143,17 @@ documents.onDidChangeContent(change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+    await initializeParser();
+
     // In this simple example we get the settings for every validate run.
     let settings = await getDocumentSettings(textDocument.uri);
 
     // The validator creates diagnostics for all uppercase words length 2 and more
     let text = textDocument.getText();
+
+    let tree = parser.parse(text);
+    console.log(tree.rootNode.toString());
+
     let pattern = /\b[A-Z]{2,}\b/g;
     let m: RegExpExecArray | null;
 
