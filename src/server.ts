@@ -17,6 +17,8 @@ import {
     TextDocument
 } from 'vscode-languageserver-textdocument';
 
+import { TokensProvider } from './highlighting';
+
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 let connection = createConnection(ProposedFeatures.all);
@@ -32,6 +34,8 @@ const Parser = require('web-tree-sitter');
 let parser: typeof Parser;
 // const PascalABCNET = require('tree-sitter-pascalabcnet');
 
+let semanticTokensProvider: TokensProvider;
+
 async function initializeParser() {
     await Parser.init();
     parser = new Parser;
@@ -41,6 +45,8 @@ async function initializeParser() {
 
 connection.onInitialize((params: InitializeParams) => {
     let capabilities = params.capabilities;
+
+    semanticTokensProvider = new TokensProvider();
 
     // Does the client support the `workspace/configuration` request?
     // If not, we fall back using global settings.
