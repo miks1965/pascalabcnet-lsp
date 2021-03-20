@@ -8,7 +8,11 @@ import {
     SemanticTokensLegend,
     SemanticTokensClientCapabilities,
     SemanticTokens,
-    Range
+    Range,
+    CancellationToken,
+    Position,
+    Hover,
+    SemanticTokensOptions
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
@@ -64,7 +68,7 @@ class Grammar {
     // Parse syntax tree
     parse(tree: parser.Tree) {
         // Travel tree and peek terms
-        let terms: { term: string; range: Range }[] = [];
+        let terms: { term: string; range: Range, length: number }[] = [];
         let stack: parser.SyntaxNode[] = [];
         let node = tree.rootNode.firstChild;
         while (stack.length > 0 || node) {
@@ -142,7 +146,8 @@ class Grammar {
                                 line: node.endPosition.row,
                                 character: node.endPosition.column
                             }
-                        }
+                        },
+                        length: node.text.length
                     });
                 }
                 // Go right
@@ -153,51 +158,150 @@ class Grammar {
     }
 }
 
-// Semantic token legend
+const termMap = new Map<string, { type: string, modifiers?: string[] }>([
+    ["type", { type: "type" }],
+    ["scope", { type: "namespace" }],
+    ["function", { type: "function" }],
+    ["variable", { type: "variable" }],
+    ["number", { type: "number" }],
+    ["string", { type: "string" }],
+    ["comment", { type: "comment" }],
+    ["constant", { type: "variable", modifiers: ["readonly", "defaultLibrary"] }],
+    ["directive", { type: "macro" }],
+    ["control", { type: "keyword" }],
+    ["operator", { type: "operator" }],
+    ["modifier", { type: "type", modifiers: ["modification"] }],
+    ["punctuation", { type: "punctuation" }]
+]);
+
 class Legend implements SemanticTokensLegend {
     tokenTypes: string[];
     tokenModifiers: string[];
 
-    constructor(types: string[], modifiers: string[]) {
-        this.tokenTypes = types;
-        this.tokenModifiers = modifiers;
+    constructor() {
+        this.tokenTypes = [];
+        this.tokenModifiers = [];
+
+        termMap.forEach(t => {
+            if (!this.tokenTypes.includes(t.type))
+                this.tokenTypes.push(t.type);
+            t.modifiers?.forEach(m => {
+                if (!this.tokenModifiers.includes(m))
+                    this.tokenModifiers.push(m);
+            });
+        });
+    }
+}
+const legend = new Legend();
+
+export class sTokensProvider implements SemanticTokensOptions {
+    legend: SemanticTokensLegend;
+    range?: boolean | {} | undefined;
+    full?: boolean | { delta?: boolean | undefined; } | undefined;
+    workDoneProgress?: boolean | undefined;
+
+    constructor() {
+        this.legend = legend;
     }
 }
 
-const termMap = new Map<string, { type: string, modifiers?: string[] }>();
-function buildLegend() {
-    // Terms vocabulary
-    termMap.set("type", { type: "type" });
-    termMap.set("scope", { type: "namespace" });
-    termMap.set("function", { type: "function" });
-    termMap.set("variable", { type: "variable" });
-    termMap.set("number", { type: "number" });
-    termMap.set("string", { type: "string" });
-    termMap.set("comment", { type: "comment" });
-    termMap.set("constant", { type: "variable", modifiers: ["readonly", "defaultLibrary"] });
-    termMap.set("directive", { type: "macro" });
-    termMap.set("control", { type: "keyword" });
-    termMap.set("operator", { type: "operator" });
-    termMap.set("modifier", { type: "type", modifiers: ["modification"] });
-    termMap.set("punctuation", { type: "punctuation" });
-    // Tokens and modifiers in use
-    let tokens: string[] = [];
-    let modifiers: string[] = [];
-    termMap.forEach(t => {
-        if (!tokens.includes(t.type))
-            tokens.push(t.type);
-        t.modifiers?.forEach(m => {
-            if (!modifiers.includes(m))
-                modifiers.push(m);
+export class Provider {
+    readonly grammar: Grammar;
+    readonly trees: { [doc: string]: parser.Tree } = {};
+    readonly supportedTerms: string[] = [];
+    readonly debugDepth: number;
+
+    tokenBuilders: Map<string, SemanticTokensBuilder> = new Map();
+    legend: SemanticTokensLegend;
+
+    // constructor() {
+    //     // Terms
+    //     const availableTerms: string[] = [
+    //         "type", "scope", "function", "variable", "number", "string", "comment",
+    //         "constant", "directive", "control", "operator", "modifier", "punctuation",
+    //     ];
+    //     const enabledTerms: string[] = vscode.workspace. // сделать эту проверку до создания объекта и передать значения в конструктор
+    //         getConfiguration("syntax").get("highlightTerms");
+    //     availableTerms.forEach(term => {
+    //         if (enabledTerms.includes(term))
+    //             this.supportedTerms.push(term);
+    //     });
+    //     if (!vscode.workspace.getConfiguration("syntax").get("highlightComment")) // и эту
+    //         if (this.supportedTerms.includes("comment"))
+    //             this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
+    //     this.debugDepth = vscode.workspace.getConfiguration("syntax").get("debugDepth"); // и эту
+
+    //     this.grammar = new Grammar();
+    //     this.grammar.init()
+    // }
+
+    constructor(enabledTerms: string[], highlightComment: boolean, debugDepth: number) {
+        const availableTerms: string[] = [
+            "type", "scope", "function", "variable", "number", "string", "comment",
+            "constant", "directive", "control", "operator", "modifier", "punctuation",
+        ];
+        availableTerms.forEach(term => {
+            if (enabledTerms.includes(term))
+                this.supportedTerms.push(term);
         });
-    });
-    // Construct semantic token legend
-    return new Legend(tokens, modifiers);
+        if (highlightComment)
+            if (this.supportedTerms.includes("comment"))
+                this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
+
+        this.debugDepth = debugDepth;
+
+        this.grammar = new Grammar();
+        this.grammar.init()
+
+        this.legend = legend;
+    }
+
+    getTokenBuilder(document: TextDocument): SemanticTokensBuilder {
+        let result = this.tokenBuilders.get(document.uri);
+        if (result !== undefined) {
+            return result;
+        }
+        result = new SemanticTokensBuilder();
+        this.tokenBuilders.set(document.uri, result);
+        return result;
+    }
+
+    async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
+        const tree = this.grammar.tree(doc.getText());
+        const terms = this.grammar.parse(tree);
+        this.trees[doc.uri.toString()] = tree;
+        // Build tokens
+        const builder = new SemanticTokensBuilder();
+        terms.forEach((t) => {
+            if (!this.supportedTerms.includes(t.term))
+                return;
+
+            const type = legend.tokenTypes.indexOf(t.term);
+            const modifiers = -1; // придумать как их находить
+
+            if (t.range.start.line === t.range.end.line)
+                return builder.push(t.range.start.line, t.range.start.character, lineAt(doc, t.range.start.line).length, type, modifiers);
+
+            let line = t.range.start.line;
+
+            let startCharacter = t.range.start.character;
+            let firstLineTermPartLength = startCharacter + lineAt(doc, line).substring(startCharacter).length;
+
+            builder.push(line, startCharacter, firstLineTermPartLength, type, modifiers);
+
+            for (line = line + 1; line < t.range.end.line; line++)
+                builder.push(line, 0, lineAt(doc, line).length, type, modifiers);
+
+            builder.push(line, 0, t.range.end.character, type, modifiers);
+        });
+        return builder.build();
+    }
 }
-const legend = buildLegend();
 
+function lineAt(doc: TextDocument, line: number) {
+    return doc.getText(Range.create(line, -1, line, Number.MAX_VALUE));
+}
 
-// export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vscode.HoverProvider {
 export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vscode.HoverProvider {
     // readonly grammars: { [lang: string]: Grammar } = {};
     readonly grammar: Grammar;
@@ -227,7 +331,7 @@ export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vs
     }
 
     // Provide document tokens
-    async provideDocumentSemanticTokens(doc: vscode.TextDocument, token: vscode.CancellationToken): Promise<SemanticTokens> {
+    async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
         // Grammar
         // const lang = doc.languageId;
         // if (!(lang == "pascalabcnet")) {
@@ -244,8 +348,8 @@ export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vs
         terms.forEach((t) => {
             if (!this.supportedTerms.includes(t.term))
                 return;
-            const type = termMap.get(t.term).type;
-            const modifiers = termMap.get(t.term).modifiers;
+            const type = termMap.get(t.term)!.type;
+            const modifiers = termMap.get(t.term)!.modifiers;
             if (t.range.start.line === t.range.end.line)
                 return builder.push(t.range, type, modifiers);
             let line = t.range.start.line;
@@ -261,13 +365,13 @@ export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vs
 
     // Provide hover tooltips
     async provideHover(
-        doc: vscode.TextDocument,
-        pos: vscode.Position,
-        token: vscode.CancellationToken): Promise<vscode.Hover> {
+        doc: TextDocument,
+        pos: Position,
+        token: CancellationToken): Promise<Hover | null> {
         const uri = doc.uri.toString();
         if (!(uri in this.trees))
             return null;
-        const grammar = this.grammars[doc.languageId];
+        // const grammar = this.grammars[doc.languageId];
         const tree = this.trees[uri];
 
         const xy: parser.Point = { row: pos.line, column: pos.character };
@@ -280,7 +384,7 @@ export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vs
             type = '"' + type + '"';
         let parent = node.parent;
 
-        const depth = Math.max(grammar.complexDepth, this.debugDepth);
+        const depth = Math.max(this.grammar.complexDepth, this.debugDepth);
         for (let i = 0; i < depth && parent; i++) {
             let parentType = parent.type;
             if (!parent.isNamed)
@@ -290,7 +394,7 @@ export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vs
         }
 
         // If there is also order complexity
-        if (grammar.complexOrder) {
+        if (this.grammar.complexOrder) {
             let index = 0;
             let sibling = node.previousSibling;
             while (sibling) {
