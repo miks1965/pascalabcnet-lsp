@@ -19,7 +19,9 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 const parserPromise = parser.init();
 class Grammar {
     // Parser
-    parser: parser = new parser();
+    // parser: parser = new parser();
+    parser: parser;
+
     // Grammar
     readonly simpleTerms: { [sym: string]: string } = {};
     readonly complexTerms: string[] = [];
@@ -27,8 +29,10 @@ class Grammar {
     readonly complexDepth: number = 0;
     readonly complexOrder: boolean = false;
 
-    constructor() {
+    constructor(parser: parser) {
         console.log("run Grammar()");
+        this.parser = parser;
+        console.log("finish this.parser = parser;");
         // Parse grammar file
         const grammarFile = __dirname + "/../grammars/pascalabcnet.json";
         const grammarJson = jsonc.parse(fs.readFileSync(grammarFile).toString());
@@ -210,7 +214,7 @@ class Legend implements SemanticTokensLegend {
 // }
 
 export class Provider {
-    // readonly grammar: Grammar;
+    readonly grammar: Grammar;
     readonly trees: { [doc: string]: parser.Tree } = {};
     readonly supportedTerms: string[] = [];
     readonly debugDepth: number;
@@ -218,7 +222,7 @@ export class Provider {
 
     tokenBuilders: Map<string, SemanticTokensBuilder> = new Map();
 
-    constructor() {
+    constructor(parser: parser) {
         const availableTerms: string[] = [
             "type", "scope", "function", "variable", "number", "string", "comment",
             "constant", "directive", "control", "operator", "modifier", "punctuation",
@@ -236,8 +240,8 @@ export class Provider {
         this.debugDepth = 1;
         console.log("инициализировали debugDepth")
 
-        // this.grammar = new Grammar();
-        console.log("не инициализировали Grammar")
+        this.grammar = new Grammar(parser);
+        console.log("инициализировали Grammar")
 
         this.legend = new Legend();
         console.log("инициализировали Legend")
@@ -276,10 +280,13 @@ export class Provider {
     }
 
     async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
-        let grammar = new Grammar();
-        await grammar.init()
-        const tree = grammar.tree(doc.getText());
-        const terms = grammar.parse(tree);
+        // let grammar = new Grammar();
+        // await grammar.init()
+        console.log("run provideDocumentSemanticTokens");
+        const tree = this.grammar.tree(doc.getText());
+        console.log("build a tree");
+        const terms = this.grammar.parse(tree);
+        console.log("finish parse terms");
         this.trees[doc.uri.toString()] = tree;
         // Build tokens
         const builder = new SemanticTokensBuilder();

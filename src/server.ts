@@ -19,43 +19,23 @@ import {
     TextDocument
 } from 'vscode-languageserver-textdocument';
 
+import * as Parser from 'web-tree-sitter';
+
 import { Provider } from './highlighting';
+import { initializeSemanticTokensProvider } from './semanticTokensProvider';
+import { initializeParser } from './parser';
 
-// Create a connection for the server, using Node's IPC as a transport.
-// Also include all preview / proposed LSP features.
 let connection = createConnection(ProposedFeatures.all);
-
-// Create a simple text document manager.
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 let hasConfigurationCapability: boolean = true;
 let hasWorkspaceFolderCapability: boolean = false;
 let hasDiagnosticRelatedInformationCapability: boolean = false;
 
-const Parser = require('web-tree-sitter');
-let parser: typeof Parser;
-// const PascalABCNET = require('tree-sitter-pascalabcnet');
-
+let parser: Parser;
 let semanticTokensProvider: Provider;
 
-async function initializeParser() {
-    await Parser.init();
-    parser = new Parser;
-    const pabcnet = await Parser.Language.load(`${__dirname}/../tree-sitter-pascalabcnet.wasm`);
-    parser.setLanguage(pabcnet);
-}
-
-async function initializeSemanticTokensProvider() {
-    // let syntaxConfiguration = await connection.workspace.getConfiguration("syntax");
-    // let enabledTerms = syntaxConfiguration.get("highlightTerms");
-    // let highlightComment = syntaxConfiguration.get("highlightComment");
-    // let debugDepth = syntaxConfiguration.get("debugDepth");
-
-    // semanticTokensProvider = new Provider(enabledTerms, highlightComment, debugDepth);
-    semanticTokensProvider = new Provider();
-}
-
-connection.onInitialize((params: InitializeParams) => {
+connection.onInitialize(async (params: InitializeParams) => {
     let capabilities = params.capabilities;
 
     // Does the client support the `workspace/configuration` request?
@@ -89,7 +69,8 @@ connection.onInitialize((params: InitializeParams) => {
         };
     }
 
-    initializeSemanticTokensProvider();
+    parser = await initializeParser();
+    semanticTokensProvider = await initializeSemanticTokensProvider(parser);
 
     return result;
 });
@@ -179,7 +160,7 @@ documents.onDidChangeContent(change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-    await initializeParser();
+    // await initializeParser();
 
     // In this simple example we get the settings for every validate run.
     let settings = await getDocumentSettings(textDocument.uri);
