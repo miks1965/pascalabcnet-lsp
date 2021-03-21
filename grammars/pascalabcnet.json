@@ -1,0 +1,24 @@
+{
+    "simpleTerms": {
+        "type": "type",
+        "identifier": "variable",
+        "\"if\"": "control",
+        "\"then\"": "control",
+        "\"else\"": "control",
+        "\"while\"": "control",
+        "\"do\"": "control",
+        "\"for\"": "control",
+        "\"to\"": "control",
+        "\"step\"": "control",
+        "semicolon": "punctuation",
+        "comma": "punctuation",
+        "left_paren": "punctuation",
+        "right_paren": "punctuation",
+        "\"=\"": "punctuation",
+        "colon": "punctuation",
+        "\"+=\"": "punctuation",
+        "\":=\"": "punctuation",
+        "_number": "number",
+        "var": "operator"
+    }
+}
