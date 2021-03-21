@@ -21,8 +21,7 @@ import {
 
 import * as Parser from 'web-tree-sitter';
 
-import { Provider } from './highlighting';
-import { initializeSemanticTokensProvider } from './semanticTokensProvider';
+import { SemanticTokensProvider } from './highlighting';
 import { initializeParser } from './parser';
 
 let connection = createConnection(ProposedFeatures.all);
@@ -33,7 +32,7 @@ let hasWorkspaceFolderCapability: boolean = false;
 let hasDiagnosticRelatedInformationCapability: boolean = false;
 
 let parser: Parser;
-let semanticTokensProvider: Provider;
+let semanticTokensProvider: SemanticTokensProvider;
 
 connection.onInitialize(async (params: InitializeParams) => {
     let capabilities = params.capabilities;
@@ -70,7 +69,7 @@ connection.onInitialize(async (params: InitializeParams) => {
     }
 
     parser = await initializeParser();
-    semanticTokensProvider = await initializeSemanticTokensProvider(parser);
+    semanticTokensProvider = new SemanticTokensProvider(parser);
 
     return result;
 });
@@ -85,7 +84,6 @@ connection.onInitialized(() => {
             connection.console.log('Workspace folder change event received.');
         });
     }
-
     const registrationOptions: SemanticTokensRegistrationOptions = {
         documentSelector: null,
         legend: semanticTokensProvider.legend,

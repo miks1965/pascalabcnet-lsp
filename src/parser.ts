@@ -7,6 +7,5 @@ export async function initializeParser(): Promise<Parser> {
     const lang = await Parser.Language.load(`${__dirname}/../tree-sitter-pascalabcnet.wasm`)
 
     parser.setLanguage(lang)
-    console.log("finish initializeParser()")
     return parser
 }
