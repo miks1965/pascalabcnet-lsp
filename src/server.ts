@@ -10,14 +10,16 @@ import {
     CompletionItemKind,
     TextDocumentPositionParams,
     TextDocumentSyncKind,
-    InitializeResult
+    InitializeResult,
+    SemanticTokensRegistrationOptions,
+    SemanticTokensRegistrationType
 } from 'vscode-languageserver/node';
 
 import {
     TextDocument
 } from 'vscode-languageserver-textdocument';
 
-import { TokensProvider } from './highlighting';
+import { Provider } from './highlighting';
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -26,7 +28,7 @@ let connection = createConnection(ProposedFeatures.all);
 // Create a simple text document manager.
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
-let hasConfigurationCapability: boolean = false;
+let hasConfigurationCapability: boolean = true;
 let hasWorkspaceFolderCapability: boolean = false;
 let hasDiagnosticRelatedInformationCapability: boolean = false;
 
@@ -34,7 +36,7 @@ const Parser = require('web-tree-sitter');
 let parser: typeof Parser;
 // const PascalABCNET = require('tree-sitter-pascalabcnet');
 
-let semanticTokensProvider: TokensProvider;
+let semanticTokensProvider: Provider;
 
 async function initializeParser() {
     await Parser.init();
@@ -43,10 +45,18 @@ async function initializeParser() {
     parser.setLanguage(pabcnet);
 }
 
+async function initializeSemanticTokensProvider() {
+    // let syntaxConfiguration = await connection.workspace.getConfiguration("syntax");
+    // let enabledTerms = syntaxConfiguration.get("highlightTerms");
+    // let highlightComment = syntaxConfiguration.get("highlightComment");
+    // let debugDepth = syntaxConfiguration.get("debugDepth");
+
+    // semanticTokensProvider = new Provider(enabledTerms, highlightComment, debugDepth);
+    semanticTokensProvider = new Provider();
+}
+
 connection.onInitialize((params: InitializeParams) => {
     let capabilities = params.capabilities;
-
-    semanticTokensProvider = new TokensProvider();
 
     // Does the client support the `workspace/configuration` request?
     // If not, we fall back using global settings.
@@ -79,6 +89,8 @@ connection.onInitialize((params: InitializeParams) => {
         };
     }
 
+    initializeSemanticTokensProvider();
+
     return result;
 });
 
@@ -92,6 +104,24 @@ connection.onInitialized(() => {
             connection.console.log('Workspace folder change event received.');
         });
     }
+
+    const registrationOptions: SemanticTokensRegistrationOptions = {
+        documentSelector: null,
+        legend: semanticTokensProvider.legend,
+        range: false,
+        full: {
+            delta: true
+        }
+    };
+    connection.client.register(SemanticTokensRegistrationType.type, registrationOptions);
+});
+
+connection.languages.semanticTokens.on((params) => {
+    const document = documents.get(params.textDocument.uri);
+    if (document == undefined)
+        return { data: [] };
+    console.log("semanticTokens.on run");
+    return semanticTokensProvider.provideDocumentSemanticTokens(document);
 });
 
 // The example settings
@@ -158,7 +188,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     let text = textDocument.getText();
 
     let tree = parser.parse(text);
-    console.log(tree.rootNode.toString());
+    // console.log(tree.rootNode.toString());
 
     let pattern = /\b[A-Z]{2,}\b/g;
     let m: RegExpExecArray | null;

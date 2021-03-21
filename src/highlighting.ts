@@ -28,9 +28,12 @@ class Grammar {
     readonly complexOrder: boolean = false;
 
     constructor() {
+        console.log("run Grammar()");
         // Parse grammar file
         const grammarFile = __dirname + "/../grammars/pascalabcnet.json";
         const grammarJson = jsonc.parse(fs.readFileSync(grammarFile).toString());
+
+        console.log("read grammar files");
 
         for (const t in grammarJson.simpleTerms)
             this.simpleTerms[t] = grammarJson.simpleTerms[t];
@@ -47,6 +50,7 @@ class Grammar {
                 this.complexOrder = true;
         }
         this.complexDepth--;
+        console.log("finish Grammar()");
     }
 
     // Parser initialization
@@ -54,7 +58,7 @@ class Grammar {
         // Load wasm parser
         await parserPromise;
         // this.parser = new parser();
-        let langFile = path.join(__dirname, "../pascalabcnet.wasm");
+        let langFile = path.join(__dirname, "../tree-sitter-pascalabcnet.wasm");
         console.log("инициализировали парсер");
         const langObj = await parser.Language.load(langFile);
         this.parser.setLanguage(langObj);
@@ -192,69 +196,74 @@ class Legend implements SemanticTokensLegend {
         });
     }
 }
-const legend = new Legend();
+// export const legend = new Legend();
 
-export class sTokensProvider implements SemanticTokensOptions {
-    legend: SemanticTokensLegend;
-    range?: boolean | {} | undefined;
-    full?: boolean | { delta?: boolean | undefined; } | undefined;
-    workDoneProgress?: boolean | undefined;
+// export class sTokensProvider implements SemanticTokensOptions {
+//     legend: SemanticTokensLegend;
+//     range?: boolean | {} | undefined;
+//     full?: boolean | { delta?: boolean | undefined; } | undefined;
+//     workDoneProgress?: boolean | undefined;
 
-    constructor() {
-        this.legend = legend;
-    }
-}
+//     constructor() {
+//         this.legend = legend;
+//     }
+// }
 
 export class Provider {
-    readonly grammar: Grammar;
+    // readonly grammar: Grammar;
     readonly trees: { [doc: string]: parser.Tree } = {};
     readonly supportedTerms: string[] = [];
     readonly debugDepth: number;
+    readonly legend: SemanticTokensLegend;
 
     tokenBuilders: Map<string, SemanticTokensBuilder> = new Map();
-    legend: SemanticTokensLegend;
 
-    // constructor() {
-    //     // Terms
-    //     const availableTerms: string[] = [
-    //         "type", "scope", "function", "variable", "number", "string", "comment",
-    //         "constant", "directive", "control", "operator", "modifier", "punctuation",
-    //     ];
-    //     const enabledTerms: string[] = vscode.workspace. // сделать эту проверку до создания объекта и передать значения в конструктор
-    //         getConfiguration("syntax").get("highlightTerms");
-    //     availableTerms.forEach(term => {
-    //         if (enabledTerms.includes(term))
-    //             this.supportedTerms.push(term);
-    //     });
-    //     if (!vscode.workspace.getConfiguration("syntax").get("highlightComment")) // и эту
-    //         if (this.supportedTerms.includes("comment"))
-    //             this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
-    //     this.debugDepth = vscode.workspace.getConfiguration("syntax").get("debugDepth"); // и эту
-
-    //     this.grammar = new Grammar();
-    //     this.grammar.init()
-    // }
-
-    constructor(enabledTerms: string[], highlightComment: boolean, debugDepth: number) {
+    constructor() {
         const availableTerms: string[] = [
             "type", "scope", "function", "variable", "number", "string", "comment",
             "constant", "directive", "control", "operator", "modifier", "punctuation",
         ];
+        console.log("вызвали конструктор Provider")
         availableTerms.forEach(term => {
-            if (enabledTerms.includes(term))
-                this.supportedTerms.push(term);
+            // if (enabledTerms.includes(term))
+            this.supportedTerms.push(term);
         });
-        if (highlightComment)
-            if (this.supportedTerms.includes("comment"))
-                this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
+        // if (highlightComment)
+        // if (this.supportedTerms.includes("comment"))
+        // this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
 
-        this.debugDepth = debugDepth;
+        // this.debugDepth = debugDepth;
+        this.debugDepth = 1;
+        console.log("инициализировали debugDepth")
 
-        this.grammar = new Grammar();
-        this.grammar.init()
+        // this.grammar = new Grammar();
+        console.log("не инициализировали Grammar")
 
-        this.legend = legend;
+        this.legend = new Legend();
+        console.log("инициализировали Legend")
     }
+
+    // constructor(enabledTerms: string[], highlightComment: boolean, debugDepth: number) {
+    //     const availableTerms: string[] = [
+    //         "type", "scope", "function", "variable", "number", "string", "comment",
+    //         "constant", "directive", "control", "operator", "modifier", "punctuation",
+    //     ];
+    //     availableTerms.forEach(term => {
+    //         // if (enabledTerms.includes(term))
+    //         this.supportedTerms.push(term);
+    //     });
+    //     // if (highlightComment)
+    //     // if (this.supportedTerms.includes("comment"))
+    //     // this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
+
+    //     // this.debugDepth = debugDepth;
+    //     this.debugDepth = 1;
+
+    //     this.grammar = new Grammar();
+    //     this.grammar.init()
+
+    //     this.legend = new Legend();
+    // }
 
     getTokenBuilder(document: TextDocument): SemanticTokensBuilder {
         let result = this.tokenBuilders.get(document.uri);
@@ -267,8 +276,10 @@ export class Provider {
     }
 
     async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
-        const tree = this.grammar.tree(doc.getText());
-        const terms = this.grammar.parse(tree);
+        let grammar = new Grammar();
+        await grammar.init()
+        const tree = grammar.tree(doc.getText());
+        const terms = grammar.parse(tree);
         this.trees[doc.uri.toString()] = tree;
         // Build tokens
         const builder = new SemanticTokensBuilder();
@@ -276,7 +287,7 @@ export class Provider {
             if (!this.supportedTerms.includes(t.term))
                 return;
 
-            const type = legend.tokenTypes.indexOf(t.term);
+            const type = this.legend.tokenTypes.indexOf(t.term);
             const modifiers = -1; // придумать как их находить
 
             if (t.range.start.line === t.range.end.line)
@@ -296,136 +307,63 @@ export class Provider {
         });
         return builder.build();
     }
+
+    // async provideHover(doc: TextDocument, pos: Position, token: CancellationToken): Promise<Hover | null> {
+    //     const uri = doc.uri.toString();
+    //     if (!(uri in this.trees))
+    //         return null;
+    //     // const grammar = this.grammars[doc.languageId];
+    //     const tree = this.trees[uri];
+
+    //     const xy: parser.Point = { row: pos.line, column: pos.character };
+    //     let node = tree.rootNode.descendantForPosition(xy);
+    //     if (!node)
+    //         return null;
+
+    //     let type = node.type;
+    //     if (!node.isNamed)
+    //         type = '"' + type + '"';
+    //     let parent = node.parent;
+
+    //     const depth = Math.max(this.grammar.complexDepth, this.debugDepth);
+    //     for (let i = 0; i < depth && parent; i++) {
+    //         let parentType = parent.type;
+    //         if (!parent.isNamed)
+    //             parentType = '"' + parentType + '"';
+    //         type = parentType + " > " + type;
+    //         parent = parent.parent;
+    //     }
+
+    //     // If there is also order complexity
+    //     if (this.grammar.complexOrder) {
+    //         let index = 0;
+    //         let sibling = node.previousSibling;
+    //         while (sibling) {
+    //             if (sibling.type === node.type)
+    //                 index++;
+    //             sibling = sibling.previousSibling;
+    //         }
+
+    //         let rindex = -1;
+    //         sibling = node.nextSibling;
+    //         while (sibling) {
+    //             if (sibling.type === node.type)
+    //                 rindex--;
+    //             sibling = sibling.nextSibling;
+    //         }
+
+    //         type = type + "[" + index + "]" + "[" + rindex + "]";
+    //     }
+
+    //     return {
+    //         contents: [type],
+    //         range: Range.create(
+    //             node.startPosition.row, node.startPosition.column,
+    //             node.endPosition.row, node.endPosition.column)
+    //     };
+    // }
 }
 
 function lineAt(doc: TextDocument, line: number) {
     return doc.getText(Range.create(line, -1, line, Number.MAX_VALUE));
-}
-
-export class TokensProvider implements vscode.DocumentSemanticTokensProvider, vscode.HoverProvider {
-    // readonly grammars: { [lang: string]: Grammar } = {};
-    readonly grammar: Grammar;
-    readonly trees: { [doc: string]: parser.Tree } = {};
-    readonly supportedTerms: string[] = [];
-    readonly debugDepth: number;
-
-    constructor() {
-        // Terms
-        const availableTerms: string[] = [
-            "type", "scope", "function", "variable", "number", "string", "comment",
-            "constant", "directive", "control", "operator", "modifier", "punctuation",
-        ];
-        const enabledTerms: string[] = vscode.workspace.
-            getConfiguration("syntax").get("highlightTerms");
-        availableTerms.forEach(term => {
-            if (enabledTerms.includes(term))
-                this.supportedTerms.push(term);
-        });
-        if (!vscode.workspace.getConfiguration("syntax").get("highlightComment"))
-            if (this.supportedTerms.includes("comment"))
-                this.supportedTerms.splice(this.supportedTerms.indexOf("comment"), 1);
-        this.debugDepth = vscode.workspace.getConfiguration("syntax").get("debugDepth");
-
-        this.grammar = new Grammar();
-        this.grammar.init()
-    }
-
-    // Provide document tokens
-    async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
-        // Grammar
-        // const lang = doc.languageId;
-        // if (!(lang == "pascalabcnet")) {
-        // this.grammars[lang] = new Grammar();
-        // await this.grammars[lang].init();
-        // }
-        // Parse document
-        // const grammar = this.grammars[lang];
-        const tree = this.grammar.tree(doc.getText());
-        const terms = this.grammar.parse(tree);
-        this.trees[doc.uri.toString()] = tree;
-        // Build tokens
-        const builder = new vscode.SemanticTokensBuilder(legend);
-        terms.forEach((t) => {
-            if (!this.supportedTerms.includes(t.term))
-                return;
-            const type = termMap.get(t.term)!.type;
-            const modifiers = termMap.get(t.term)!.modifiers;
-            if (t.range.start.line === t.range.end.line)
-                return builder.push(t.range, type, modifiers);
-            let line = t.range.start.line;
-            builder.push(new vscode.Range(t.range.start,
-                doc.lineAt(line).range.end), type, modifiers);
-            for (line = line + 1; line < t.range.end.line; line++)
-                builder.push(doc.lineAt(line).range, type, modifiers);
-            builder.push(new vscode.Range(doc.lineAt(line).range.start,
-                t.range.end), type, modifiers);
-        });
-        return builder.build();
-    }
-
-    // Provide hover tooltips
-    async provideHover(
-        doc: TextDocument,
-        pos: Position,
-        token: CancellationToken): Promise<Hover | null> {
-        const uri = doc.uri.toString();
-        if (!(uri in this.trees))
-            return null;
-        // const grammar = this.grammars[doc.languageId];
-        const tree = this.trees[uri];
-
-        const xy: parser.Point = { row: pos.line, column: pos.character };
-        let node = tree.rootNode.descendantForPosition(xy);
-        if (!node)
-            return null;
-
-        let type = node.type;
-        if (!node.isNamed)
-            type = '"' + type + '"';
-        let parent = node.parent;
-
-        const depth = Math.max(this.grammar.complexDepth, this.debugDepth);
-        for (let i = 0; i < depth && parent; i++) {
-            let parentType = parent.type;
-            if (!parent.isNamed)
-                parentType = '"' + parentType + '"';
-            type = parentType + " > " + type;
-            parent = parent.parent;
-        }
-
-        // If there is also order complexity
-        if (this.grammar.complexOrder) {
-            let index = 0;
-            let sibling = node.previousSibling;
-            while (sibling) {
-                if (sibling.type === node.type)
-                    index++;
-                sibling = sibling.previousSibling;
-            }
-
-            let rindex = -1;
-            sibling = node.nextSibling;
-            while (sibling) {
-                if (sibling.type === node.type)
-                    rindex--;
-                sibling = sibling.nextSibling;
-            }
-
-            type = type + "[" + index + "]" + "[" + rindex + "]";
-        }
-
-        return {
-            contents: [type],
-            range: {
-                start: {
-                    line: node.startPosition.row,
-                    character: node.startPosition.column
-                },
-                end: {
-                    line: node.endPosition.row,
-                    character: node.endPosition.column
-                }
-            }
-        }
-    };
 }
