@@ -198,10 +198,10 @@ export class SemanticTokensProvider {
     constructor(parser: Parser) {
         const availableTerms: string[] = [
             "type", "scope", "function", "variable", "number", "string", "comment",
-            "constant", "directive", "control", "operator", "modifier", "punctuation",
+            "constant", "directive", "keyword", "operator", "modifier", "punctuation",
         ];
         availableTerms.forEach(term => {
-            this.supportedTerms.push(term); // может быть докопаться до того как в настройках искать эти термы и сделать фильтрацию
+            this.supportedTerms.push(term);
         });
 
         this.debugDepth = 1;
@@ -231,7 +231,7 @@ export class SemanticTokensProvider {
                 return;
 
             const type = this.legend.tokenTypes.indexOf(t.term);
-            const modifiers = -1; // придумать как их находить
+            const modifiers = -1;
 
             if (t.range.start.line === t.range.end.line)
                 return builder.push(t.range.start.line, t.range.start.character, t.length, type, modifiers);
