@@ -12,17 +12,19 @@ import {
     TextDocumentSyncKind,
     InitializeResult,
     SemanticTokensRegistrationOptions,
-    SemanticTokensRegistrationType
+    SemanticTokensRegistrationType,
+    DocumentFormattingParams,
 } from 'vscode-languageserver/node';
 
 import {
-    TextDocument
+    TextDocument, TextEdit
 } from 'vscode-languageserver-textdocument';
 
 import * as Parser from 'web-tree-sitter';
 
 import { SemanticTokensProvider } from './highlighting';
 import { initializeParser } from './parser';
+import { Grammar } from './grammar';
 
 let connection = createConnection(ProposedFeatures.all);
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -33,6 +35,7 @@ let hasDiagnosticRelatedInformationCapability: boolean = false;
 
 let parser: Parser;
 let semanticTokensProvider: SemanticTokensProvider;
+let grammar: Grammar;
 
 connection.onInitialize(async (params: InitializeParams) => {
     let capabilities = params.capabilities;
@@ -54,6 +57,7 @@ connection.onInitialize(async (params: InitializeParams) => {
     const result: InitializeResult = {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
+            documentFormattingProvider: true,
             // Tell the client that this server supports code completion.
             completionProvider: {
                 resolveProvider: true
@@ -69,7 +73,8 @@ connection.onInitialize(async (params: InitializeParams) => {
     }
 
     parser = await initializeParser();
-    semanticTokensProvider = new SemanticTokensProvider(parser);
+    grammar = new Grammar(parser);
+    semanticTokensProvider = new SemanticTokensProvider(parser, grammar);
 
     return result;
 });
@@ -89,7 +94,7 @@ connection.onInitialized(() => {
         legend: semanticTokensProvider.legend,
         range: false,
         full: {
-            delta: true
+            delta: false
         }
     };
     connection.client.register(SemanticTokensRegistrationType.type, registrationOptions);
@@ -155,10 +160,10 @@ documents.onDidClose(e => {
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent(change => {
     validateTextDocument(change.document);
+    semanticTokensProvider.provideDocumentSemanticTokens(change.document);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-    // await initializeParser();
 
     // In this simple example we get the settings for every validate run.
     let settings = await getDocumentSettings(textDocument.uri);
@@ -214,6 +219,68 @@ connection.onDidChangeWatchedFiles(_change => {
     // Monitored files have change in VSCode
     connection.console.log('We received an file change event');
 });
+
+connection.onDocumentFormatting(formatDocument)
+
+async function formatDocument(params: DocumentFormattingParams) {
+    console.log("start formatting")
+    const text = documents.get(params.textDocument.uri)?.getText()
+    if (!text) return
+
+    const tree = grammar.tree(text)
+    let newText = prettyPrint(tree.rootNode.firstChild, 0)
+    let lines = newText.split("\n")
+    let character = lines[lines.length - 1].length
+
+    const edits: TextEdit[] = []
+    edits.push({
+        range: {
+            start: { line: 0, character: 0 },
+            end: {
+                line: lines.length,
+                character
+            }
+        },
+        newText
+    })
+
+    console.log("end formatting")
+    return edits
+}
+
+function prettyPrint(node: Parser.SyntaxNode | null, nestingLevel: number) {
+    let text = ""
+
+    if (!node)
+        return text
+
+    if (node.type == "compound_stmt") {
+        text += printCompound(node, nestingLevel + 1)
+    } else if (!node.firstChild) {
+        // обработать тут точки с запятыми и знаки препинания
+        text += node.text
+    } else {
+        node.children.forEach(child =>
+            text += prettyPrint(child, nestingLevel)
+        )
+    }
+
+    return text
+}
+
+function printCompound(node: Parser.SyntaxNode, nestingLevel: number) {
+    let padBraces = "".padStart((nestingLevel - 1) * 4)
+    let pad = "".padStart(nestingLevel * 4)
+
+    let text = padBraces + "begin" + "\n"
+    node.children.forEach(child => {
+        if (child.type != "tkBegin" && child.type != "tkEnd")
+            text += pad + prettyPrint(child, nestingLevel)
+    })
+    text += "\n" + padBraces + "end"
+
+    return text
+}
 
 // This handler provides the initial list of the completion items.
 connection.onCompletion(
