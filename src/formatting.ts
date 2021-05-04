@@ -158,9 +158,9 @@ function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingL
     } else if (node.type == "compound_stmt") {
         trimPrevious = true
         let pad = "".padStart(nestingLevel * 4)
-        text += "\n" + pad + prettyPrint(node.firstChild, true, nestingLevel)[0] + "\n"
-            + prettyPrint(node.firstChild.nextSibling, true, nestingLevel + 1)[0] + "\n"
-            + pad + prettyPrint(node.lastChild, true, nestingLevel)[0]
+        text += "\n" + pad + prettyPrint(node.firstChild, true, nestingLevel - 1)[0] + "\n"
+            + prettyPrint(node.firstChild.nextSibling, true, nestingLevel)[0] + "\n"
+            + pad + prettyPrint(node.lastChild, true, nestingLevel - 1)[0]
     } else {
         node.children.forEach(child => {
             let prettyPrinted = prettyPrint(child, spaceAfter, nestingLevel)
