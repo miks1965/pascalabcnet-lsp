@@ -1,75 +1,18 @@
 import Parser = require("web-tree-sitter")
+import { rules, SpaceCategory } from "./formattingRules"
 
 export function format(node: Parser.SyntaxNode | null): string {
-    return prettyPrint(node)[0]
+    let prettyPrinted = prettyPrint(node)
+
+    if (prettyPrinted[1])
+        return prettyPrinted[0].trimEnd()
+
+    return prettyPrinted[0]
 }
-
-const betweenSpaces = [
-    "tkVertParen",
-    "tkAmpersend",
-    "tkAssign",
-    "tkPlusEqual",
-    "tkMinusEqual",
-    "tkMultEqual",
-    "tkDivEqual",
-    "tkMinus",
-    "tkPlus",
-    "tkSlash",
-    "tkStar",
-    "tkEqual",
-    "tkGreater",
-    "tkGreaterEqual",
-    "tkLower",
-    "tkLowerEqual",
-    "tkNotEqual",
-    "tkArrow",
-    "tkOr",
-    "tkXor",
-    "tkAnd",
-    "tkDiv",
-    "tkMod",
-    "tkShl",
-    "tkShr",
-    "tkNot",
-    "tkAs",
-    "tkIn",
-    "tkIs",
-]
-
-const noSpaceAfter = [
-    "tkRoundOpen",
-    "tkSquareOpen",
-    "tkQuestionSquareOpen",
-    "tkAddressOf",
-    "tkDotDot",
-    "tkQuestionPoint",
-    "tkStarStar"
-]
-
-const noSpaceBefore = [
-    "tkRoundClose",
-    "tkSquareClose",
-    "tkComma",
-    "tkColon",
-    "tkDotDot",
-    "tkQuestionPoint",
-    "tkStarStar",
-    "tkSemiColon"
-]
 
 // нужно идентить стмт_лист в:
 // initialization_part, try_handler, case_stmt
 // найти срезы и там отдельно обработать квадратные скобки
-
-// const newlineAfter = [
-//     // "tkSemiColon",
-//     "tkInterface",
-//     "tkDo", // вообще там даже следующий идент надо делать, так что хз
-//     "tkBegin",
-//     "tkInitialization",
-//     "tkImplementation",
-//     "tkFinally"
-// ]
 
 const commaSeparatedLists = [
     "program_param_list",
@@ -114,29 +57,42 @@ const semicolonSeparatedLists = [
     "full_lambda_fp_list"
 ]
 
-const newlineAfter = [
-    "tkBegin"
-]
-
-const newLineBefore = [
-    "tkEnd"
-]
-
 function formatToken(node: Parser.SyntaxNode, spaceAfter = true, nestingLevel = 0) {
     console.log("formatToken " + node.type)
 
     let pad = "".padStart(nestingLevel * 4)
 
-    if (!spaceAfter || noSpaceAfter.includes(node.type))
+    if (!spaceAfter)
         return pad + node.text
 
-    // if (newlineAfter.includes(node.type))
-    //     return pad + `${node.text}\n`
-
-    // if (newLineBefore.includes(node.type))
-    //     return pad + `\n${node.text}`
-
     return pad + `${node.text} `
+}
+
+let lastTokenType = ""
+
+function processToken(node: Parser.SyntaxNode, spaceAfter: boolean): [string, boolean] {
+    let text = ""
+    let trimPrevious = false
+    let typeRules = rules.get(node.type)
+
+    if (!typeRules)
+        text += formatToken(node, spaceAfter)
+    else {
+        let spaceCategory: SpaceCategory[] = []
+        typeRules.forEach(rule => {
+            if (rule.conditions(node.type, lastTokenType))
+                spaceCategory.push(rule.spaceCategory)
+        })
+        if (spaceCategory.includes(SpaceCategory.noSpaceBefore))
+            trimPrevious = true
+        if (spaceCategory.includes(SpaceCategory.noSpaceAfter))
+            text += formatToken(node, false)
+        else
+            text += formatToken(node, spaceAfter)
+    }
+    lastTokenType = node.type
+
+    return [text, trimPrevious]
 }
 
 function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingLevel = 0): [string, boolean] {
@@ -148,9 +104,9 @@ function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingL
     let trimPrevious = false
 
     if (!node.firstChild) {
-        if (noSpaceBefore.includes(node.type))
-            trimPrevious = true
-        text += formatToken(node, spaceAfter)
+        let processed = processToken(node, spaceAfter)
+        text += processed[0]
+        trimPrevious = processed[1]
     } else if (commaSeparatedLists.includes(node.type)) {
         text += printCommaSeparatedList(node)
     } else if (semicolonSeparatedLists.includes(node.type)) {
@@ -158,14 +114,18 @@ function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingL
     } else if (node.type == "compound_stmt") {
         trimPrevious = true
         let pad = "".padStart(nestingLevel * 4)
-        text += "\n" + pad + prettyPrint(node.firstChild, true, nestingLevel - 1)[0] + "\n"
+        text += "\n" + pad + prettyPrint(node.firstChild, false, nestingLevel - 1)[0] + "\n"
             + prettyPrint(node.firstChild.nextSibling, true, nestingLevel)[0] + "\n"
-            + pad + prettyPrint(node.lastChild, true, nestingLevel - 1)[0]
+            + pad + prettyPrint(node.lastChild, false, nestingLevel - 1)[0]
     } else {
         node.children.forEach(child => {
             let prettyPrinted = prettyPrint(child, spaceAfter, nestingLevel)
-            if (prettyPrinted[1])
-                text = text.trimEnd()
+            if (prettyPrinted[1]) {
+                if (text != "")
+                    text = text.trimEnd()
+                else
+                    trimPrevious = true
+            }
             text += prettyPrinted[0]
         })
     }
@@ -173,18 +133,21 @@ function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingL
     return [text, trimPrevious]
 }
 
-// разделителями бывают не только запятые
-// если поинт, то наверное без пробелов
-
 function printCommaSeparatedList(node: Parser.SyntaxNode) {
     let text = ""
 
     node.children.forEach(child => {
-        if (child.type == "tkComma")
+        if (child.type == "tkComma") {
             text += `${child.text} `
-        else if (child.type == "tkDot")
+            lastTokenType = child.type
+        }
+        else if (child.type == "tkDot") {
             text += `${child.text}`
-        else {
+            lastTokenType = child.type
+        }
+        else if (child.type == node.type) {
+            text += prettyPrint(child)[0]
+        } else {
             text += prettyPrint(child, false)[0]
         }
     })
@@ -197,9 +160,10 @@ function printSemicolonSeparatedList(node: Parser.SyntaxNode, nestingLevel: numb
     let pad = "".padStart(nestingLevel * 4)
 
     node.children.forEach(child => {
-        if (child.type == "tkSemiColon")
+        if (child.type == "tkSemiColon") {
             text = text.trimEnd() + `${child.text}\n`
-        else if (child.type == node.type)
+            lastTokenType = child.type
+        } else if (child.type == node.type)
             text += prettyPrint(child, true, nestingLevel - 1)[0]
         else {
             text += pad + prettyPrint(child, true, nestingLevel)[0]
@@ -208,37 +172,3 @@ function printSemicolonSeparatedList(node: Parser.SyntaxNode, nestingLevel: numb
 
     return text
 }
-
-// function printList(node: Parser.SyntaxNode, separator: Separator, nestingLevel: number = 0) {
-//     let pad = "".padStart(nestingLevel * 4)
-//     let text = ""
-
-//     node.children.forEach(child => {
-//         if (child.type == "tkComma")
-//             text += `${child.text} `
-//         else if (child.type == "tkSemiColon")
-//             text += `${child.text}\n`
-//         else if (child.type == node.type)
-//             text += printList(child, nestingLevel, separator)
-//         else {
-//             if (separator == Separator.COMMA)
-//                 text += prettyPrint(child, nestingLevel, false)
-//             else
-//                 text += pad + prettyPrint(child, nestingLevel, false)
-//         }
-//     })
-
-//     return text
-// }
-
-// function printCompound(node: Parser.SyntaxNode, nestingLevel: number) {
-//     let pad = "".padStart(nestingLevel * 4)
-
-//     let text = ""
-//     node.children.forEach(child => {
-//         if (child.type != "tkBegin" && child.type != "tkEnd")
-//             text += pad + prettyPrint(child, nestingLevel)
-//     })
-
-//     return text
-// }
