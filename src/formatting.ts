@@ -80,7 +80,7 @@ function processToken(node: Parser.SyntaxNode, spaceAfter: boolean): [string, bo
     else {
         let spaceCategory: SpaceCategory[] = []
         typeRules.forEach(rule => {
-            if (rule.conditions(node.type, lastTokenType))
+            if (rule.conditions(lastTokenType))
                 spaceCategory.push(rule.spaceCategory)
         })
         if (spaceCategory.includes(SpaceCategory.noSpaceBefore))
@@ -139,10 +139,6 @@ function printCommaSeparatedList(node: Parser.SyntaxNode) {
     node.children.forEach(child => {
         if (child.type == "tkComma") {
             text += `${child.text} `
-            lastTokenType = child.type
-        }
-        else if (child.type == "tkDot") {
-            text += `${child.text}`
             lastTokenType = child.type
         }
         else if (child.type == node.type) {
