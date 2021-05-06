@@ -80,7 +80,7 @@ function processToken(node: Parser.SyntaxNode, spaceAfter: boolean): [string, bo
     else {
         let spaceCategory: SpaceCategory[] = []
         typeRules.forEach(rule => {
-            if (rule.conditions(lastTokenType))
+            if (rule.conditions(node, lastTokenType))
                 spaceCategory.push(rule.spaceCategory)
         })
         if (spaceCategory.includes(SpaceCategory.noSpaceBefore))
@@ -180,5 +180,9 @@ function printSemicolonSeparatedList(node: Parser.SyntaxNode, nestingLevel: numb
 }
 
 const beforeBlock = [
-    "tkDo"
+    "tkDo",
+    "tkInterface",
+    "tkInitialization",
+    "tkImplementation",
+    "tkFinally"
 ]
