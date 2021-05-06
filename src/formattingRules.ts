@@ -112,4 +112,5 @@ const operations = [
     "tkShl",
     "tkShr",
     "tkAnd",
+    "tkAssign"
 ]

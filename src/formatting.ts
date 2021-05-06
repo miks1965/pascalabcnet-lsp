@@ -54,12 +54,11 @@ const semicolonSeparatedLists = [
     "stmt_list",
     "case_list",
     "exception_handler_list",
-    "full_lambda_fp_list"
+    "full_lambda_fp_list",
+    "member_list"
 ]
 
 function formatToken(node: Parser.SyntaxNode, spaceAfter = true, nestingLevel = 0) {
-    // console.log("formatToken " + node.type)
-
     let pad = "".padStart(nestingLevel * 4)
 
     if (!spaceAfter)
@@ -164,7 +163,7 @@ function printSemicolonSeparatedList(node: Parser.SyntaxNode, nestingLevel: numb
     let pad = "".padStart(nestingLevel * 4)
 
     node.children.forEach(child => {
-        if (child.type == "tkSemiColon") {
+        if (child.type == "tkSemiColon" || child.type == "optional_semicolon") {
             text = text.trimEnd() + `${child.text}`
             if (child.nextSibling)
                 text += "\n"
@@ -181,6 +180,11 @@ function printSemicolonSeparatedList(node: Parser.SyntaxNode, nestingLevel: numb
 
 const beforeBlock = [
     "tkDo",
+    "tkThen",
+    "tkTry",
+    "tkFinally",
+    "tkExcept",
+    "tkClass",
     "tkInterface",
     "tkInitialization",
     "tkImplementation",
