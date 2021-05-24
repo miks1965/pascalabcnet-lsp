@@ -5,14 +5,6 @@ PascalABC.NET language server implementation based on [Tree-sitter](https://gith
 
 ## Features
 
-- [x] Highlighting
-
-
-![sample](images/sample.jpg)
-
-
-## In Progress
-
-- [ ] Autoformatting
-- [ ] Jump to declaration
-- [ ] Find references
+- Highlighting
+- Autoformatting
+- Autocomplete
