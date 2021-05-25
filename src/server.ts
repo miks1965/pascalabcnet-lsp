@@ -25,6 +25,7 @@ import * as Parser from 'web-tree-sitter';
 import { SemanticTokensProvider } from './highlighting';
 import { initializeParser } from './parser';
 import { Grammar } from './grammar';
+import { format } from './formatting';
 
 let connection = createConnection(ProposedFeatures.all);
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -223,12 +224,11 @@ connection.onDidChangeWatchedFiles(_change => {
 connection.onDocumentFormatting(formatDocument)
 
 async function formatDocument(params: DocumentFormattingParams) {
-    console.log("start formatting")
     const text = documents.get(params.textDocument.uri)?.getText()
     if (!text) return
 
     const tree = grammar.tree(text)
-    let newText = prettyPrint(tree.rootNode.firstChild, 0)
+    let newText = format(tree.rootNode.firstChild)
     let lines = newText.split("\n")
     let character = lines[lines.length - 1].length
 
@@ -244,42 +244,7 @@ async function formatDocument(params: DocumentFormattingParams) {
         newText
     })
 
-    console.log("end formatting")
     return edits
-}
-
-function prettyPrint(node: Parser.SyntaxNode | null, nestingLevel: number) {
-    let text = ""
-
-    if (!node)
-        return text
-
-    if (node.type == "compound_stmt") {
-        text += printCompound(node, nestingLevel + 1)
-    } else if (!node.firstChild) {
-        // обработать тут точки с запятыми и знаки препинания
-        text += node.text
-    } else {
-        node.children.forEach(child =>
-            text += prettyPrint(child, nestingLevel)
-        )
-    }
-
-    return text
-}
-
-function printCompound(node: Parser.SyntaxNode, nestingLevel: number) {
-    let padBraces = "".padStart((nestingLevel - 1) * 4)
-    let pad = "".padStart(nestingLevel * 4)
-
-    let text = padBraces + "begin" + "\n"
-    node.children.forEach(child => {
-        if (child.type != "tkBegin" && child.type != "tkEnd")
-            text += pad + prettyPrint(child, nestingLevel)
-    })
-    text += "\n" + padBraces + "end"
-
-    return text
 }
 
 // This handler provides the initial list of the completion items.

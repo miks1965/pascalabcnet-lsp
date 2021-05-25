@@ -9,8 +9,6 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { Grammar } from './grammar';
 
-// const parserPromise = Parser.init();
-
 const termMap = new Map<string, { type: string, modifiers?: string[] }>([
     ["type", { type: "type" }],
     ["scope", { type: "namespace" }],
@@ -83,9 +81,8 @@ export class SemanticTokensProvider {
         const tree = this.grammar.tree(doc.getText());
         const terms = this.grammar.parse(tree);
         this.trees[doc.uri.toString()] = tree;
-        // Build tokens
+
         const builder = new SemanticTokensBuilder();
-        console.log("providing tokens, terms count: " + terms.length)
         terms.forEach((t) => {
             if (!this.supportedTerms.includes(t.term))
                 return;
@@ -99,7 +96,7 @@ export class SemanticTokensProvider {
             let line = t.range.start.line;
 
             let startCharacter = t.range.start.character;
-            let firstLineTermPartLength = startCharacter + lineAt(doc, line).substring(startCharacter).length;
+            let firstLineTermPartLength = lineAt(doc, line).substring(startCharacter).length;
 
             builder.push(line, startCharacter, firstLineTermPartLength, type, modifiers);
 
