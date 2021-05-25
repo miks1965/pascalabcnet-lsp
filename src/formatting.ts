@@ -135,9 +135,10 @@ function prettyPrint(node: Parser.SyntaxNode | null, spaceAfter = true, nestingL
 
 function printCompoundStmt(node: Parser.SyntaxNode, nestingLevel: number): string {
     let pad = "".padStart(nestingLevel * 4)
+    let innerPart = node.children.length > 2 ? node.firstChild!.nextSibling : null
 
     return "\n" + pad + prettyPrint(node.firstChild, false, nestingLevel - 1)[0] + "\n"
-        + prettyPrint(node.firstChild!.nextSibling, true, nestingLevel)[0] + "\n"
+        + prettyPrint(innerPart, true, nestingLevel)[0] + "\n"
         + pad + prettyPrint(node.lastChild, false, nestingLevel - 1)[0]
 }
 

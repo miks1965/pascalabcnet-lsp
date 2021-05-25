@@ -26,9 +26,11 @@ import { SemanticTokensProvider } from './highlighting';
 import { initializeParser } from './parser';
 import { Grammar } from './grammar';
 import { format } from './formatting';
+import { keywordCompletionItems } from './completion'
 
 let connection = createConnection(ProposedFeatures.all);
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+let completionItems: CompletionItem[] = []
 
 let hasConfigurationCapability: boolean = true;
 let hasWorkspaceFolderCapability: boolean = false;
@@ -77,6 +79,8 @@ connection.onInitialize(async (params: InitializeParams) => {
     grammar = new Grammar(parser);
     semanticTokensProvider = new SemanticTokensProvider(parser, grammar);
 
+    completionItems = keywordCompletionItems();
+
     return result;
 });
 
@@ -105,7 +109,7 @@ connection.languages.semanticTokens.on((params) => {
     const document = documents.get(params.textDocument.uri);
     if (document == undefined)
         return { data: [] };
-    console.log("semanticTokens.on run");
+
     return semanticTokensProvider.provideDocumentSemanticTokens(document);
 });
 
@@ -229,20 +233,27 @@ async function formatDocument(params: DocumentFormattingParams) {
 
     const tree = grammar.tree(text)
     let newText = format(tree.rootNode.firstChild)
-    let lines = newText.split("\n")
-    let character = lines[lines.length - 1].length
 
     const edits: TextEdit[] = []
-    edits.push({
-        range: {
-            start: { line: 0, character: 0 },
-            end: {
-                line: lines.length,
-                character
-            }
+    edits.push(
+        {
+            range: {
+                start: { line: 0, character: 0 },
+                end: {
+                    line: Number.MAX_VALUE,
+                    character: Number.MAX_VALUE
+                }
+            },
+            newText: ''
         },
-        newText
-    })
+        {
+            range: {
+                start: { line: 0, character: 0 },
+                end: { line: 0, character: 0 }
+            },
+            newText
+        }
+    )
 
     return edits
 }
@@ -253,18 +264,8 @@ connection.onCompletion(
         // The pass parameter contains the position of the text document in
         // which code complete got requested. For the example we ignore this
         // info and always provide the same completion items.
-        return [
-            {
-                label: 'TypeScript',
-                kind: CompletionItemKind.Text,
-                data: 1
-            },
-            {
-                label: 'JavaScript',
-                kind: CompletionItemKind.Text,
-                data: 2
-            }
-        ];
+
+        return completionItems
     }
 );
 
@@ -283,9 +284,6 @@ connection.onCompletionResolve(
     }
 );
 
-// Make the text document manager listen on the connection
-// for open, change and close text document events
 documents.listen(connection);
 
-// Listen on the connection
 connection.listen();
