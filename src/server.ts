@@ -211,6 +211,11 @@ async function formatDocument(params: DocumentFormattingParams) {
     if (!text) return
 
     const tree = grammar.tree(text)
+    if (tree.rootNode.hasError()) {
+        connection.window.showErrorMessage("Невозможно отформатировать синтаксически неверную программу")
+        return
+    }
+
     let newText = format(tree.rootNode.firstChild)
 
     const edits: TextEdit[] = []
