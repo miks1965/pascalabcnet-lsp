@@ -1,9 +1,7 @@
 import * as Parser from 'web-tree-sitter';
 import * as jsonc from 'jsonc-parser';
 import * as fs from 'fs';
-import {
-    Range,
-} from 'vscode-languageserver';
+import { Range } from 'vscode-languageserver';
 
 export class Grammar {
     parser: Parser;
@@ -37,62 +35,6 @@ export class Grammar {
 
     tree(doc: string) {
         return this.parser.parse(doc);
-    }
-
-    format(tree: Parser.Tree) {
-        let stack: { node: Parser.SyntaxNode, nestingLevel: number }[] = []
-        let node = tree.rootNode.firstChild
-        const spacesOnLevel = 4
-
-        if (node)
-            stack.push({ node: node, nestingLevel: 0 })
-
-        while (stack.length > 0) {
-            let value = stack.pop()
-            let currentNode = value?.node
-            let nestingLevel = value?.nestingLevel
-
-            let nextSibling = currentNode?.nextSibling
-            if (nextSibling && nestingLevel != null)
-                stack.push({ node: nextSibling, nestingLevel: nestingLevel })
-
-            if (currentNode && nestingLevel != null) {
-                let newNestingLevel = nestingLevel
-                if (currentNode.type == "compound_stmt") {
-                    newNestingLevel++
-                    this.shiftChildren(currentNode, newNestingLevel, spacesOnLevel)
-                }
-                let child = currentNode.firstChild
-                while (child) {
-                    stack.push({ node: child, nestingLevel: newNestingLevel })
-                    child = child.nextSibling
-                }
-            }
-        }
-
-        return tree
-    }
-
-    shiftChildren(node: Parser.SyntaxNode, nestingLevel: number, spacesOnLevel: number) {
-        let shift = nestingLevel * spacesOnLevel
-        let child = node.firstChild
-
-        while (child) {
-            if (shift != 0 && child.type != "tkBegin" && child.type != "tkEnd") {
-                console.log("shifting " + child.type)
-
-                console.log("old end = " + child.endPosition.column)
-                child.endPosition.column += shift - child.startPosition.column
-                console.log("new end = " + child.endPosition.column)
-
-                console.log("old start = " + child.startPosition.column)
-                child.startPosition.column = shift
-                console.log("new start = " + child.startPosition.column)
-
-            }
-            console.log(child)
-            child = child.nextSibling
-        }
     }
 
     parse(tree: Parser.Tree) {

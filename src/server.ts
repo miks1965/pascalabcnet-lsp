@@ -224,7 +224,6 @@ connection.onDidChangeWatchedFiles(_change => {
 connection.onDocumentFormatting(formatDocument)
 
 async function formatDocument(params: DocumentFormattingParams) {
-    console.log("start formatting")
     const text = documents.get(params.textDocument.uri)?.getText()
     if (!text) return
 
@@ -245,7 +244,6 @@ async function formatDocument(params: DocumentFormattingParams) {
         newText
     })
 
-    console.log("end formatting")
     return edits
 }
 
