@@ -43,8 +43,6 @@ let grammar: Grammar;
 connection.onInitialize(async (params: InitializeParams) => {
     let capabilities = params.capabilities;
 
-    // Does the client support the `workspace/configuration` request?
-    // If not, we fall back using global settings.
     hasConfigurationCapability = !!(
         capabilities.workspace && !!capabilities.workspace.configuration
     );
@@ -61,7 +59,6 @@ connection.onInitialize(async (params: InitializeParams) => {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             documentFormattingProvider: true,
-            // Tell the client that this server supports code completion.
             completionProvider: {
                 resolveProvider: true
             }
@@ -86,7 +83,6 @@ connection.onInitialize(async (params: InitializeParams) => {
 
 connection.onInitialized(() => {
     if (hasConfigurationCapability) {
-        // Register for all configuration changes.
         connection.client.register(DidChangeConfigurationNotification.type, undefined);
     }
     if (hasWorkspaceFolderCapability) {
@@ -113,23 +109,17 @@ connection.languages.semanticTokens.on((params) => {
     return semanticTokensProvider.provideDocumentSemanticTokens(document);
 });
 
-// The example settings
 interface ExampleSettings {
     maxNumberOfProblems: number;
 }
 
-// The global settings, used when the `workspace/configuration` request is not supported by the client.
-// Please note that this is not the case when using this server with the client provided in this example
-// but could happen with other clients.
 const defaultSettings: ExampleSettings = { maxNumberOfProblems: 1000 };
 let globalSettings: ExampleSettings = defaultSettings;
 
-// Cache the settings of all open documents
 let documentSettings: Map<string, Thenable<ExampleSettings>> = new Map();
 
 connection.onDidChangeConfiguration(change => {
     if (hasConfigurationCapability) {
-        // Reset all cached document settings
         documentSettings.clear();
     } else {
         globalSettings = <ExampleSettings>(
@@ -137,7 +127,6 @@ connection.onDidChangeConfiguration(change => {
         );
     }
 
-    // Revalidate all open text documents
     documents.all().forEach(validateTextDocument);
 });
 
@@ -156,13 +145,10 @@ function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
     return result;
 }
 
-// Only keep settings for open documents
 documents.onDidClose(e => {
     documentSettings.delete(e.document.uri);
 });
 
-// The content of a text document has changed. This event is emitted
-// when the text document first opened or when its content has changed.
 documents.onDidChangeContent(change => {
     validateTextDocument(change.document);
     semanticTokensProvider.provideDocumentSemanticTokens(change.document);
@@ -170,14 +156,9 @@ documents.onDidChangeContent(change => {
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
-    // In this simple example we get the settings for every validate run.
     let settings = await getDocumentSettings(textDocument.uri);
 
-    // The validator creates diagnostics for all uppercase words length 2 and more
     let text = textDocument.getText();
-
-    let tree = parser.parse(text);
-    // console.log(tree.rootNode.toString());
 
     let pattern = /\b[A-Z]{2,}\b/g;
     let m: RegExpExecArray | null;
@@ -216,12 +197,10 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
         diagnostics.push(diagnostic);
     }
 
-    // Send the computed diagnostics to VSCode.
     connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
 connection.onDidChangeWatchedFiles(_change => {
-    // Monitored files have change in VSCode
     connection.console.log('We received an file change event');
 });
 
@@ -269,8 +248,6 @@ connection.onCompletion(
     }
 );
 
-// This handler resolves additional information for the item selected in
-// the completion list.
 connection.onCompletionResolve(
     (item: CompletionItem): CompletionItem => {
         if (item.data === 1) {
