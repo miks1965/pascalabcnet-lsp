@@ -30,9 +30,7 @@ function diff(currentText: string, newText: string): [string, string] {
     let startPosition = 0
 
     do {
-        let prevSymbol = currentText[startPosition]
-        let newSymbol = newText[startPosition]
-        if (prevSymbol == newSymbol)
+        if (currentText[startPosition] == newText[startPosition])
             startPosition++
         else
             break
@@ -56,18 +54,29 @@ function diff(currentText: string, newText: string): [string, string] {
             break
     } while (prevEndPosition >= 0 && newEndPosition >= 0);
 
-    while (prevEndPosition < currentText.length - 1 && isLetter(currentText[prevEndPosition]))
+    while (prevEndPosition < currentText.length - 1 && isLetter(currentText[prevEndPosition + 1]))
         prevEndPosition++
-    while (newEndPosition < newText.length - 1 && isLetter(newText[newEndPosition]))
+    while (newEndPosition < newText.length - 1 && isLetter(newText[newEndPosition + 1]))
         newEndPosition++
 
     prevEndPosition = prevEndPosition > startPosition ? prevEndPosition : startPosition
     newEndPosition = newEndPosition > startPosition ? newEndPosition : startPosition
 
-    const removedText = currentText.substring(startPosition, prevEndPosition + 1)
-    const addedText = newText.substring(startPosition, newEndPosition + 1)
+    let removedText = currentText.substring(startPosition, prevEndPosition + 1)
+    let addedText = newText.substring(startPosition, newEndPosition + 1)
+
+    if (containsOnlyLetters(addedText))
+        addedText = ""
 
     return [removedText, addedText]
+}
+
+function containsOnlyLetters(text: string) {
+    for (let i = 0; i < text.length; i++)
+        if (!isLetter(text[i]))
+            return false
+
+    return true
 }
 
 function extractWords(text: string): string[] {
@@ -79,7 +88,7 @@ function extractWords(text: string): string[] {
         const symbol = text[position]
         if (isLetter(symbol))
             word += symbol
-        else if (word.length > 0 && !keywords.includes(word)) {
+        else if (word.length > 0) {
             result.push(word)
             word = ""
         }
@@ -118,12 +127,12 @@ function unique(removedWords: string[], addedWords: string[]): [string[], string
     const newAdded: string[] = []
 
     removedWords.forEach(word => {
-        if (!addedWords.includes(word))
+        if (!addedWords.includes(word) && !keywords.includes(word) && !newRemoved.includes(word))
             newRemoved.push(word)
     })
 
     addedWords.forEach(word => {
-        if (!removedWords.includes(word))
+        if (!removedWords.includes(word) && !keywords.includes(word) && !newAdded.includes(word))
             newAdded.push(word)
     })
 

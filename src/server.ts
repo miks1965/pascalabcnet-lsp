@@ -131,6 +131,7 @@ connection.onDidChangeConfiguration(change => {
 let currentText = ""
 
 documents.onDidOpen(e => {
+    updateCompletion(currentText, e.document)
     currentText = e.document.getText();
 })
 
