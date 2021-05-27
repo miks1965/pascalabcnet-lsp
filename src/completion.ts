@@ -22,7 +22,21 @@ export function keywordCompletionItems() {
     return items;
 }
 
-function isLetter(character: string) {
+export async function updateCompletion(currentText: string, textDocument: TextDocument) {
+    const [removedText, addedText] = diff(currentText, textDocument.getText())
+    const [removedWords, addedWords] = filterWords(extractWords(removedText), extractWords(addedText))
+
+    // console.log("remove: ")
+    // removedWords.forEach(word => console.log(word + ", "))
+
+    // console.log("add: ")
+    // addedWords.forEach(word => console.log(word + ", "))
+
+    removeCompletionElements(removedWords)
+    addCompletionElements(addedWords)
+}
+
+function isAllowedInNames(character: string) {
     return character && character.toLowerCase() != character.toUpperCase()
 }
 
@@ -39,7 +53,7 @@ function diff(currentText: string, newText: string): [string, string] {
     if (startPosition == currentText.length && startPosition == newText.length)
         return ["", ""]
 
-    while (startPosition > 0 && isLetter(newText[startPosition - 1]))
+    while (startPosition > 0 && isAllowedInNames(newText[startPosition - 1]))
         startPosition--
 
     let prevEndPosition = currentText.length - 1
@@ -54,9 +68,9 @@ function diff(currentText: string, newText: string): [string, string] {
             break
     } while (prevEndPosition >= 0 && newEndPosition >= 0);
 
-    while (prevEndPosition < currentText.length - 1 && isLetter(currentText[prevEndPosition + 1]))
+    while (prevEndPosition < currentText.length - 1 && isAllowedInNames(currentText[prevEndPosition + 1]))
         prevEndPosition++
-    while (newEndPosition < newText.length - 1 && isLetter(newText[newEndPosition + 1]))
+    while (newEndPosition < newText.length - 1 && isAllowedInNames(newText[newEndPosition + 1]))
         newEndPosition++
 
     prevEndPosition = prevEndPosition > startPosition ? prevEndPosition : startPosition
@@ -73,7 +87,7 @@ function diff(currentText: string, newText: string): [string, string] {
 
 function containsOnlyLetters(text: string) {
     for (let i = 0; i < text.length; i++)
-        if (!isLetter(text[i]))
+        if (!isAllowedInNames(text[i]))
             return false
 
     return true
@@ -86,7 +100,7 @@ function extractWords(text: string): string[] {
 
     while (position < text.length - 1) {
         const symbol = text[position]
-        if (isLetter(symbol))
+        if (isAllowedInNames(symbol))
             word += symbol
         else if (word.length > 0) {
             result.push(word)
@@ -95,7 +109,7 @@ function extractWords(text: string): string[] {
         position++
     }
 
-    if (word.length > 0 && !keywords.includes(word))
+    if (word.length > 0)
         result.push(word)
 
     return result
@@ -122,7 +136,7 @@ function addCompletionElements(addedWords: string[]) {
     })
 }
 
-function unique(removedWords: string[], addedWords: string[]): [string[], string[]] {
+function filterWords(removedWords: string[], addedWords: string[]): [string[], string[]] {
     const newRemoved: string[] = []
     const newAdded: string[] = []
 
@@ -137,20 +151,6 @@ function unique(removedWords: string[], addedWords: string[]): [string[], string
     })
 
     return [newRemoved, newAdded]
-}
-
-export async function updateCompletion(currentText: string, textDocument: TextDocument) {
-    const [removedText, addedText] = diff(currentText, textDocument.getText())
-    const [removedWords, addedWords] = unique(extractWords(removedText), extractWords(addedText))
-
-    console.log("remove: ")
-    removedWords.forEach(word => console.log(word + ", "))
-
-    console.log("add: ")
-    addedWords.forEach(word => console.log(word + ", "))
-
-    removeCompletionElements(removedWords)
-    addCompletionElements(addedWords)
 }
 
 function completionElementIndex(element: string): number {
