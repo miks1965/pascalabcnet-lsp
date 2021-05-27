@@ -26,11 +26,11 @@ import { SemanticTokensProvider } from './highlighting';
 import { initializeParser } from './parser';
 import { Grammar } from './grammar';
 import { format } from './formatting';
-import { keywordCompletionItems } from './completion'
+import { keywordCompletionItems, updateCompletion } from './completion'
 
 let connection = createConnection(ProposedFeatures.all);
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
-let completionItems: CompletionItem[] = []
+export let completionItems: CompletionItem[] = []
 
 let hasConfigurationCapability: boolean = true;
 let hasWorkspaceFolderCapability: boolean = false;
@@ -60,7 +60,7 @@ connection.onInitialize(async (params: InitializeParams) => {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             documentFormattingProvider: true,
             completionProvider: {
-                resolveProvider: true
+                resolveProvider: false
             }
         }
     };
@@ -126,79 +126,23 @@ connection.onDidChangeConfiguration(change => {
             (change.settings.languageServerExample || defaultSettings)
         );
     }
-
-    documents.all().forEach(validateTextDocument);
 });
 
-function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
-    if (!hasConfigurationCapability) {
-        return Promise.resolve(globalSettings);
-    }
-    let result = documentSettings.get(resource);
-    if (!result) {
-        result = connection.workspace.getConfiguration({
-            scopeUri: resource,
-            section: 'pabcnet-server-ts'
-        });
-        documentSettings.set(resource, result);
-    }
-    return result;
-}
+let currentText = ""
+
+documents.onDidOpen(e => {
+    currentText = e.document.getText();
+})
 
 documents.onDidClose(e => {
     documentSettings.delete(e.document.uri);
 });
 
 documents.onDidChangeContent(change => {
-    validateTextDocument(change.document);
     semanticTokensProvider.provideDocumentSemanticTokens(change.document);
+    updateCompletion(currentText, change.document)
+    currentText = change.document.getText()
 });
-
-async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-
-    let settings = await getDocumentSettings(textDocument.uri);
-
-    let text = textDocument.getText();
-
-    let pattern = /\b[A-Z]{2,}\b/g;
-    let m: RegExpExecArray | null;
-
-    let problems = 0;
-    let diagnostics: Diagnostic[] = [];
-    while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
-        problems++;
-        let diagnostic: Diagnostic = {
-            severity: DiagnosticSeverity.Warning,
-            range: {
-                start: textDocument.positionAt(m.index),
-                end: textDocument.positionAt(m.index + m[0].length)
-            },
-            message: `${m[0]} is all uppercase.`,
-            source: 'ex'
-        };
-        if (hasDiagnosticRelatedInformationCapability) {
-            diagnostic.relatedInformation = [
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range)
-                    },
-                    message: 'Spelling matters'
-                },
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range)
-                    },
-                    message: 'Particularly for names'
-                }
-            ];
-        }
-        diagnostics.push(diagnostic);
-    }
-
-    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-}
 
 connection.onDidChangeWatchedFiles(_change => {
     connection.console.log('We received an file change event');
@@ -215,8 +159,6 @@ async function formatDocument(params: DocumentFormattingParams) {
         connection.window.showErrorMessage("Невозможно отформатировать синтаксически неверную программу")
         return
     }
-
-    let newText = format(tree.rootNode.firstChild)
 
     const edits: TextEdit[] = []
     edits.push(
@@ -235,34 +177,16 @@ async function formatDocument(params: DocumentFormattingParams) {
                 start: { line: 0, character: 0 },
                 end: { line: 0, character: 0 }
             },
-            newText
+            newText: format(tree.rootNode.firstChild)
         }
     )
 
     return edits
 }
 
-// This handler provides the initial list of the completion items.
 connection.onCompletion(
     (_textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-        // The pass parameter contains the position of the text document in
-        // which code complete got requested. For the example we ignore this
-        // info and always provide the same completion items.
-
         return completionItems
-    }
-);
-
-connection.onCompletionResolve(
-    (item: CompletionItem): CompletionItem => {
-        if (item.data === 1) {
-            item.detail = 'TypeScript details';
-            item.documentation = 'TypeScript documentation';
-        } else if (item.data === 2) {
-            item.detail = 'JavaScript details';
-            item.documentation = 'JavaScript documentation';
-        }
-        return item;
     }
 );
 
