@@ -1,7 +1,7 @@
 {
     "name": "pascalabcnet-lsp",
     "description": "PascalABC.NET language server",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "author": "Oxana Kostikova",
     "license": "MIT",
     "engines": {
