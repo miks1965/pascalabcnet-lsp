@@ -109,25 +109,6 @@ connection.languages.semanticTokens.on((params) => {
     return semanticTokensProvider.provideDocumentSemanticTokens(document);
 });
 
-interface ExampleSettings {
-    maxNumberOfProblems: number;
-}
-
-const defaultSettings: ExampleSettings = { maxNumberOfProblems: 1000 };
-let globalSettings: ExampleSettings = defaultSettings;
-
-let documentSettings: Map<string, Thenable<ExampleSettings>> = new Map();
-
-connection.onDidChangeConfiguration(change => {
-    if (hasConfigurationCapability) {
-        documentSettings.clear();
-    } else {
-        globalSettings = <ExampleSettings>(
-            (change.settings.languageServerExample || defaultSettings)
-        );
-    }
-});
-
 let currentText = ""
 
 documents.onDidOpen(e => {
@@ -135,9 +116,7 @@ documents.onDidOpen(e => {
     currentText = e.document.getText();
 })
 
-documents.onDidClose(e => {
-    documentSettings.delete(e.document.uri);
-});
+documents.onDidClose(e => { });
 
 documents.onDidChangeContent(change => {
     semanticTokensProvider.provideDocumentSemanticTokens(change.document);
