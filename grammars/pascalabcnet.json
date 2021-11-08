@@ -153,6 +153,7 @@
         "tkHex": "number",
         "tkFloat": "number",
         "tkStringLiteral": "string",
-        "tkFormatStringLiteral": "string"
+        "tkFormatStringLiteral": "string",
+        "comment": "comment"
     }
 }
