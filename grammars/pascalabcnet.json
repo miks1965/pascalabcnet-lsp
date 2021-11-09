@@ -136,14 +136,14 @@
         "tkDirectiveName": "directive",
         "tkShortProgram": "macro",
         "tkShortSFProgram": "macro",
-        "tkNil": "variable.readonly.defaultLibrary",
+        "tkNil": "constant",
         "typed_const": "constant",
         "literal": "string",
-        "proc_call": "function",
         "proc_name": "function",
         "func_name": "function",
         "func_name_with_template_args": "function",
         "type_ref": "type",
+        "used_unit_name": "type",
         "program_block": "scope",
         "block": "scope",
         "external_block": "scope",
@@ -154,6 +154,7 @@
         "tkFloat": "number",
         "tkStringLiteral": "string",
         "tkFormatStringLiteral": "string",
-        "comment": "comment"
+        "comment": "comment",
+        "tkIdentifier": "variable"
     }
 }
