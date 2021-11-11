@@ -1,4 +1,3 @@
-// import * as vscode from 'vscode';
 import * as Parser from 'web-tree-sitter';
 import {
     SemanticTokensBuilder,
@@ -78,7 +77,7 @@ export class SemanticTokensProvider {
     }
 
     async provideDocumentSemanticTokens(doc: TextDocument): Promise<SemanticTokens> {
-        const tree = this.grammar.tree(doc.getText());
+        const tree = this.grammar.tree(doc.getText());        
         const terms = this.grammar.parse(tree);
         this.trees[doc.uri.toString()] = tree;
 

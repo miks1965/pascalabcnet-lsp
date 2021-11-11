@@ -2,12 +2,16 @@ import Parser = require("web-tree-sitter")
 import { rules, SpaceCategory } from "./formattingRules"
 
 export function format(node: Parser.SyntaxNode | null): string {
-    let prettyPrinted = prettyPrint(node)
+    let prettyPrinted = ''
+    node?.children.forEach((child) => {
+        var printedNode = prettyPrint(child);
+        if (printedNode[1])
+            prettyPrinted += printedNode[0].trimEnd()
+        else
+            prettyPrinted += printedNode[0]
+    })
 
-    if (prettyPrinted[1])
-        return prettyPrinted[0].trimEnd()
-
-    return prettyPrinted[0]
+    return prettyPrinted
 }
 
 // нужно идентить стмт_лист в:

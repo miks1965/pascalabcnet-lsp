@@ -58,7 +58,7 @@ connection.onInitialize(async (params: InitializeParams) => {
     const result: InitializeResult = {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
-            documentFormattingProvider: true,
+            // documentFormattingProvider: true,
             completionProvider: {
                 resolveProvider: false
             }
@@ -128,7 +128,8 @@ connection.onDidChangeWatchedFiles(_change => {
     connection.console.log('We received an file change event');
 });
 
-connection.onDocumentFormatting(formatDocument)
+// Отключено до выяснения обстоятельств
+// connection.onDocumentFormatting(formatDocument)
 
 async function formatDocument(params: DocumentFormattingParams) {
     const text = documents.get(params.textDocument.uri)?.getText()
@@ -157,7 +158,7 @@ async function formatDocument(params: DocumentFormattingParams) {
                 start: { line: 0, character: 0 },
                 end: { line: 0, character: 0 }
             },
-            newText: format(tree.rootNode.firstChild)
+            newText: format(tree.rootNode)
         }
     )
 

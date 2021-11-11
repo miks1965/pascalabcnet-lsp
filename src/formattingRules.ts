@@ -97,6 +97,11 @@ export const rules = new Map([
         [
             new FormattingRule(SpaceCategory.newLineAfter, () => true)
         ]
+    ],
+    ["comment",
+        [
+            new FormattingRule(SpaceCategory.newLineAfter, () => true)
+        ]
     ]
 ])
 
